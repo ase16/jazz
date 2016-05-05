@@ -4,10 +4,6 @@ const config = require('config');
 const log = require('winston');
 log.level = config.get('log.level');
 
-const bucketSize = 1000;
-var currentBucket = 0;
-var currentCountInBucket = 0;
-
 let db;
 
 // Twitter API module
@@ -18,10 +14,10 @@ const twit = require('twit');
 // Tweet JSON: https://dev.twitter.com/overview/api/tweets
 // Stream API: https://dev.twitter.com/streaming/overview
 
-// tweets in db and ts when queried.
+// #tweets and ts when last updated.
 var stats = {
     timestamp: 0,
-    numberOfTweets: 0
+    tweetsCount: 0
 };
 
 // @parma callback fn(arr) - get array of keywords
@@ -35,19 +31,6 @@ function getKeywords(callback) {
         } else {
             keywords = words;
         }
-
-        // fetching tweets given keywords in a file
-        /*
-        var fs = require('fs');
-        var keywordsFile = 'keywords.txt';
-        try {
-            fs.accessSync(keywordsFile, fs.R_OK);
-            keywords = fs.readFileSync(keywordsFile).toString().split('\n');
-        } catch (e) {
-            log.error("Cannot access keywords file: " + keywordsFile);
-            keywords = [];
-        }
-        */
 
         keywords = keywords.filter(function(k) {
             return k.length > 1;
@@ -65,16 +48,12 @@ function onNewTweet(tweet) {
     log.debug('New Tweet:\t[id: %s, text: %s]', tweet['id_str'], tweet['text']);
     //console.log(tweet);
 
-    db.insertTweetIntoBucket(tweet, currentBucket, function (err, result) {
+    db.insertTweet(tweet, function(err, result){
         if (err) {
             log.error('Could not insert tweet:', err);
         } else {
-            currentCountInBucket = result.value.count;
-            log.debug('Inserted tweet into the database. Current bucket: %s, count: %s',
-                                                    currentBucket, currentCountInBucket);
-            if (currentCountInBucket >= bucketSize) {
-                currentBucket += 1;
-            }
+            log.debug('Inserted tweet into the database.');
+            stats.tweetsCount += 1;
         }
     });
 }
@@ -123,23 +102,8 @@ function subscribeToTweets(callback) {
 }
 
 // prints some statistics about the tweets in the DB and the received tweets.
-function logStats(db) {
-    tweetfetcher.getStats((data) => log.info(data))
-}
-
-// sets up the tweets collection and logging stats
-function setupTweetsCollection() {
-    db.createTweetsCollection(function(err) {
-        // log number of tweets in the db from time to time.
-        db.countTweets(function(err, count) {
-            stats = {
-                timestamp: new Date().getTime(),
-                numberOfTweets: count
-            };
-            logStats(db);
-        });
-        setInterval(logStats, 10*1000, db);
-    });
+function logStats() {
+    tweetfetcher._updateStats((tweetsPerSec) => log.info('Fetching ' + tweetsPerSec + ' tweets/second'));
 }
 
 var twitterCredentials = config.get('twitter');
@@ -152,77 +116,27 @@ const tweetfetcher = {
 
         db = dbModule;
 
-        setupTweetsCollection();
+        // set up logging of stats
+        setInterval(logStats, 10*1000);
 
-        db.getCurrentTweetBucket(function(err, res) {
-            if (err) {
-                log.warn('Error retrieving current tweet bucket.', err);
-            } else {
-                if (res) {
-                    currentBucket = res['bucket'];
-                    currentCountInBucket = res['count'];
-                } else {
-                    currentBucket = 0;
-                    currentCountInBucket = 0;
-                }
-
-                log.info('Current tweet bucket: %s, count: %s', currentBucket, currentCountInBucket);
-
-                subscribeToTweets(function(stream) {
-                    twitterStream = stream;
-                    callback()
-                    log.info("Tweetfetcher initialized")
-                });
-            }
+        // connect to twitter
+        subscribeToTweets(function(stream) {
+            twitterStream = stream;
+            callback();
+            log.info("Tweetfetcher initialized");
         });
     },
 
-    getStats : function(callback) {
-        db.countTweets(function(err, count) {
-            if (!err) {
-                var now = new Date().getTime();
-                var newTweets = count-stats['numberOfTweets'];
-                var timeSpan = now-stats['timestamp'];
-                var tweetspersec = (newTweets/timeSpan*1000).toFixed(1);
-                if (isNaN(tweetspersec)) { tweetspersec=0 }
-                stats = {
-                    'timestamp': now,
-                    'numberOfTweets': count
-                };
+   _updateStats : function(callback) {
+        var now = new Date().getTime();
+        var timeSpan = now-stats['timestamp'];
+        var newTweets = stats['tweetsCount'];
+        var tweetsPerSec = (newTweets/timeSpan*1000).toFixed(1);
+        if (isNaN(tweetsPerSec)) { tweetsPerSec=0.0 }
+        stats.timestamp = now;
+        stats.tweetsCount = 0;
 
-                // TODO: move this somewhere else - this is just for the demonstration!
-                // TODO: make a aggregation query that fetches all info in 1 query ("group by")
-
-                /**
-                 Query (make sure that the indexes are used! otherwise the query is very slow and expensive)
-                 db.tweets.aggregate(
-                 {
-                     $group: {
-                         _id: {
-                            inProgress: "$inProgress",
-                            analyzed : "$analyzed"
-                            },
-                         count: { $sum: 1 }
-                     }
-                 }
-                 )
-                 */
-                db.countTweetsAnalyzed(function(err, countAnalyzed) {
-                   db.countTweetsInProgress(function(err, countInProgress) {
-                       db.countTweetsPending(function(err, countPending) {
-                           callback(
-                               count + ' tweets in database ('
-                               + countAnalyzed + ' analyzed, '
-                               + countInProgress + ' in progress, '
-                               + countPending + ' pending), currently fetching '
-                               + tweetspersec + ' tweets/second.');
-                       })
-                   })
-                });
-
-
-            }
-        });
+        callback(tweetsPerSec);
     }
 }
 
