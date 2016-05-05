@@ -1,0 +1,22 @@
+{
+  "name": "jazz",
+  "description": "fetches tweets from twitter",
+  "version": "1.0.0",
+  "main": "app.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ase16/jazz.git"
+  },
+  "author": "Oliver Leumann, Andreas Albrecht, Roy Rutishauser, Shanmathuran Sritharan",
+  "license": "MIT",
+  "dependencies": {
+    "config": "^1.19.0",
+    "gcloud": "^0.32.0",
+    "mongodb": "^2.1.16",
+    "twit": "^2.2.3",
+    "winston": "^2.2.0"
+  }
+}
