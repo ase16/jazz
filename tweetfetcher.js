@@ -16,14 +16,12 @@ const twit = require('twit');
 
 // #tweets and ts when last updated.
 var stats = {
-    timestamp: 0,
+    timestamp: new Date().getTime(),
     tweetsCount: 0
 };
 
 // @parma callback fn(arr) - get array of keywords
 function getKeywords(callback) {
-    // TODO: allow adding new keywords on the fly, (e.g. onNewKeywordAdded -> need to set up stream again for that)
-
     db.getAllTerms(function(err, words) {
         var keywords = [];
         if (err) {
@@ -32,12 +30,28 @@ function getKeywords(callback) {
             keywords = words;
         }
 
-        keywords = keywords.filter(function(k) {
-            return k.length > 1;
-        });
+        // fetching tweets given keywords in a file
+        // useful for debugging
+        /*
+        var fs = require('fs');
+        var keywordsFile = 'keywords.txt';
+        try {
+        fs.accessSync(keywordsFile, fs.R_OK);
+        keywords = fs.readFileSync(keywordsFile).toString().split('\n');
+        } catch (e) {
+        log.error("Cannot access keywords file: " + keywordsFile);
+        keywords = [];
+        }
+        */
+
+        // some basic cleansing
         keywords = keywords.map(function(k) {
-            return k.toLowerCase();
+            return k.toLowerCase().trim();
         });
+        keywords = keywords.filter(function(k) {
+            return k.length > 0;
+        });
+
         callback(keywords);
     });
 }
@@ -73,7 +87,7 @@ function subscribeToTweets(callback) {
         // the messages are described here:
         // https://dev.twitter.com/streaming/overview/messages-types
         stream.on('connect', function (request) {
-            log.info('Twitter - Connect.');
+            log.info('Twitter - Connect');
         });
         stream.on('connected', function (response) {
             log.info('Twitter - Connected');

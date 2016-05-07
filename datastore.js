@@ -23,42 +23,23 @@ const db = {
     // @param callback fn(err, res)
     // --> res is an array containing terms e.g. ['jay-z', 'google', 'solarpower']
     getAllTerms: function(callback) {
-        if (isConnected()) {
-            // TODO: implement query!
+        if (!isConnected()) {
+            return callback("Not connected", []);
+        }
 
-            // fetching tweets given keywords in a file
-            var keywords = []
-            var fs = require('fs');
-            var keywordsFile = 'keywords.txt';
-            try {
-                fs.accessSync(keywordsFile, fs.R_OK);
-                keywords = fs.readFileSync(keywordsFile).toString().split('\n');
-            } catch (e) {
-                log.error("Cannot access keywords file: " + keywordsFile);
-                keywords = [];
+        var keywords = [];
+        var query = datastore.createQuery('Term');				// --> https://googlecloudplatform.github.io/gcloud-node/#/docs/v0.32.0/datastore?method=createQuery
+        datastore.runQuery(query, function(err, entities) {		// --> https://googlecloudplatform.github.io/gcloud-node/#/docs/v0.32.0/datastore?method=runQuery
+            if (err) {
+                log.error("datastore.readTerms error: Entities = ", err);
+                return callback(err, null);
             }
 
+            entities.forEach(function(e) {
+                keywords.push(e.key.name);
+            });
             callback(null, keywords);
-
-        } else {
-            callback("Not connected", []);
-        }
-    },
-
-    getTerm: function(term, callback) {
-        // TODO: return entity for given term
-    },
-
-    insertTerm: function(term, cid, callback) {
-        // TODO: get entity for given term, add cid (if not present yet), call update
-    },
-
-    updateTerm: function(term, callback) {
-        // TODO: updates a term entity (save it).
-    },
-
-    removeTerm: function(term, cid, callback) {
-        // TODO. get entity for given term, remove cid (if present), call update or if no cid left -> delete term entity,
+        });
     },
 
     // Add a new tweet.
