@@ -7,9 +7,7 @@
     },
 
     "gcloud": {
-        "projectId": "ase16-1255",
-        "keyFilename": "config/ASE16-cd70a773b84a.json",
-        "zone": "europe-west1-d"
+        "projectId": "ase16-1255"
     },
 
     "log": {

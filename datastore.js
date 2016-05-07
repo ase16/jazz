@@ -31,7 +31,7 @@ const db = {
         var query = datastore.createQuery('Term');				// --> https://googlecloudplatform.github.io/gcloud-node/#/docs/v0.32.0/datastore?method=createQuery
         datastore.runQuery(query, function(err, entities) {		// --> https://googlecloudplatform.github.io/gcloud-node/#/docs/v0.32.0/datastore?method=runQuery
             if (err) {
-                log.error("datastore.readTerms error: Entities = ", err);
+                log.error("datastore.readTerms error: Error = ", err);
                 return callback(err, null);
             }
 
