@@ -1,0 +1,18 @@
+{
+    "twitter": {
+        "consumer_key": "",
+        "consumer_secret": "",
+        "access_token": "",
+        "access_token_secret": ""
+    },
+
+    "gcloud": {
+        "projectId": "ase16-1255",
+        "keyFilename": "config/ASE16-cd70a773b84a.json",
+        "zone": "europe-west1-d"
+    },
+
+    "log": {
+        "level": "info"
+    }
+}
