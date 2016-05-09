@@ -52,12 +52,16 @@ const db = {
         }
 
         var tweetKey = datastore.key('Tweet');
+        var time = Date.parse(tweet['created_at']);
+        if (isNaN(time)) {
+            time = Date.now();
+        }
         datastore.save({
                 key: tweetKey,
                 data: {
                     id_str: tweet['id_str'],
-                    created_at: tweet['created_at'],
-                    inProgress: false,
+                    created_at: time,
+                    isAnalyzed: false,
                     tweet: tweet['text']
                 }
         }, function(err) {

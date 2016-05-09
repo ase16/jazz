@@ -32,17 +32,17 @@ function getKeywords(callback) {
 
         // fetching tweets given keywords in a file
         // useful for debugging
-        /*
+
         var fs = require('fs');
         var keywordsFile = 'keywords.txt';
         try {
-        fs.accessSync(keywordsFile, fs.R_OK);
-        keywords = fs.readFileSync(keywordsFile).toString().split('\n');
+            fs.accessSync(keywordsFile, fs.R_OK);
+            keywords = fs.readFileSync(keywordsFile).toString().split('\n');
         } catch (e) {
-        log.error("Cannot access keywords file: " + keywordsFile);
-        keywords = [];
+            log.error("Cannot access keywords file: " + keywordsFile);
+            keywords = [];
         }
-        */
+
 
         // some basic cleansing
         keywords = keywords.map(function(k) {
@@ -117,7 +117,15 @@ function subscribeToTweets(callback) {
 
 // prints some statistics about the tweets in the DB and the received tweets.
 function logStats() {
-    tweetfetcher._updateStats((tweetsPerSec) => log.info('Fetching ' + tweetsPerSec + ' tweets/second'));
+    var now = new Date().getTime();
+    var timeSpan = now-stats['timestamp'];
+    var newTweets = stats['tweetsCount'];
+    var tweetsPerSec = (newTweets/timeSpan*1000).toFixed(1);
+    if (isNaN(tweetsPerSec)) { tweetsPerSec=0.0 }
+    stats.timestamp = now;
+    stats.tweetsCount = 0;
+    
+    log.info('Fetching ' + tweetsPerSec + ' tweets/second');
 }
 
 var twitterCredentials = config.get('twitter');
@@ -140,18 +148,6 @@ const tweetfetcher = {
             log.info("Tweetfetcher initialized");
         });
     },
-
-   _updateStats : function(callback) {
-        var now = new Date().getTime();
-        var timeSpan = now-stats['timestamp'];
-        var newTweets = stats['tweetsCount'];
-        var tweetsPerSec = (newTweets/timeSpan*1000).toFixed(1);
-        if (isNaN(tweetsPerSec)) { tweetsPerSec=0.0 }
-        stats.timestamp = now;
-        stats.tweetsCount = 0;
-
-        callback(tweetsPerSec);
-    }
-}
+};
 
 module.exports = tweetfetcher;
