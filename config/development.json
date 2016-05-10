@@ -7,7 +7,8 @@
     },
 
     "gcloud": {
-        "projectId": "ase16-1255"
+        "projectId": "ase16-1255",
+        "zone": "europe-west1-d"
     },
 
     "log": {

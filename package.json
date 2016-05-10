@@ -14,8 +14,9 @@
   "license": "MIT",
   "dependencies": {
     "config": "^1.19.0",
-    "winston": "^2.2.0",
     "gcloud": "^0.32.0",
-    "twit": "^2.2.3"
+    "googleapis": "^5.2.1",
+    "twit": "^2.2.3",
+    "winston": "^2.2.0"
   }
 }

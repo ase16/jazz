@@ -1,10 +1,12 @@
-'use strict'
+'use strict';
 
 const config = require('config');
 const log = require('winston');
 log.level = config.get('log.level');
 
 let db;
+let vms = [];
+let roundRobinIndex = 0;
 
 // Twitter API module
 // https://github.com/ttezel/twit
@@ -30,9 +32,7 @@ function getKeywords(callback) {
             keywords = words;
         }
 
-        // fetching tweets given keywords in a file
-        // useful for debugging
-
+        // fetching tweets given keywords in a file --> useful for debugging
         var fs = require('fs');
         var keywordsFile = 'keywords.txt';
         try {
@@ -42,7 +42,6 @@ function getKeywords(callback) {
             log.error("Cannot access keywords file: " + keywordsFile);
             keywords = [];
         }
-
 
         // some basic cleansing
         keywords = keywords.map(function(k) {
@@ -60,9 +59,10 @@ function getKeywords(callback) {
 // additional processing into the tweets collection.
 function onNewTweet(tweet) {
     log.debug('New Tweet:\t[id: %s, text: %s]', tweet['id_str'], tweet['text']);
-    //console.log(tweet);
 
-    db.insertTweet(tweet, function(err, result){
+	var currentRoundRobinIndex = roundRobinIndex;
+	roundRobinIndex = ((roundRobinIndex + 1) % vms.length == 0 ? 0 : roundRobinIndex + 1);
+    db.insertTweet(tweet, vms[currentRoundRobinIndex], function(err, result){
         if (err) {
             log.error('Could not insert tweet:', err);
         } else {
@@ -115,6 +115,31 @@ function subscribeToTweets(callback) {
     });
 }
 
+function readVMs() {
+    var cgeConfig = config.get("gcloud");
+    var cloud = require('./cloud.js')(cgeConfig, function(err) {
+        if (!err) {
+            cloud.listWorkerInstances(function(err, res) {
+                if (!err) {
+					console.log(res.managedInstances);
+					vms = res.managedInstances.filter(function(vm) {
+						return (vm.hasOwnProperty('instanceStatus') && vm.instanceStatus === 'RUNNING');
+					}).map(function(vm) {
+						return vm.name;
+					});
+					console.log(vms);
+                }
+                else {
+					console.log(err);
+                }
+            });
+        }
+        else {
+			console.log(err);
+        }
+    });
+}
+
 // prints some statistics about the tweets in the DB and the received tweets.
 function logStats() {
     var now = new Date().getTime();
@@ -141,13 +166,17 @@ const tweetfetcher = {
         // set up logging of stats
         setInterval(logStats, 10*1000);
 
+        // Periodically update list of available nodes of the will-nodes instance group
+		readVMs();
+        setInterval(readVMs, 10*1000);
+
         // connect to twitter
         subscribeToTweets(function(stream) {
             twitterStream = stream;
             callback();
             log.info("Tweetfetcher initialized");
         });
-    },
+    }
 };
 
 module.exports = tweetfetcher;
