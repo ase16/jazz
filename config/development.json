@@ -7,8 +7,12 @@
     },
 
     "gcloud": {
-        "projectId": "ase16-1255",
-        "zone": "europe-west1-d"
+        "projectId": "ase16-1255"
+    },
+
+    "will": {
+        "instanceGroupName": "will-nodes",
+        "instanceGroupZone": "europe-west1-d"
     },
 
     "log": {
