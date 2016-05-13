@@ -1,16 +1,15 @@
 'use strict';
 
 const config = require('config');
+const twit = require('twit');			// Twitter API module --> https://github.com/ttezel/twit
 const log = require('winston');
 log.level = config.get('log.level');
 
 let db;
 let vms = [];
 let roundRobinIndex = 0;
-
-// Twitter API module
-// https://github.com/ttezel/twit
-const twit = require('twit');
+let cgeConfig = config.get("gcloud");
+let will = config.get("will");
 
 // Useful links for the Twitter API:
 // Tweet JSON: https://dev.twitter.com/overview/api/tweets
@@ -115,19 +114,17 @@ function subscribeToTweets(callback) {
     });
 }
 
-function readVMs() {
-    var cgeConfig = config.get("gcloud");
+function updateAvailableVMs() {
     var cloud = require('./cloud.js')(cgeConfig, function(err) {
         if (!err) {
-            cloud.listWorkerInstances(function(err, res) {
+            cloud.listVMsOfInstanceGroup(will.instanceGroupZone, will.instanceGroupName, function(err, res) {
                 if (!err) {
-					console.log(res.managedInstances);
 					vms = res.managedInstances.filter(function(vm) {
 						return (vm.hasOwnProperty('instanceStatus') && vm.instanceStatus === 'RUNNING');
 					}).map(function(vm) {
 						return vm.name;
 					});
-					console.log(vms);
+					log.info("Available will-nodes = ", vms);
                 }
                 else {
 					console.log(err);
@@ -167,8 +164,8 @@ const tweetfetcher = {
         setInterval(logStats, 10*1000);
 
         // Periodically update list of available nodes of the will-nodes instance group
-		readVMs();
-        setInterval(readVMs, 10*1000);
+        updateAvailableVMs();
+        setInterval(updateAvailableVMs, 10*1000);
 
         // connect to twitter
         subscribeToTweets(function(stream) {
