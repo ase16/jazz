@@ -32,6 +32,7 @@ function getKeywords(callback) {
         }
 
         // fetching tweets given keywords in a file --> useful for debugging
+        /*
         var fs = require('fs');
         var keywordsFile = 'keywords.txt';
         try {
@@ -41,6 +42,7 @@ function getKeywords(callback) {
             log.error("Cannot access keywords file: " + keywordsFile);
             keywords = [];
         }
+        */
 
         // some basic cleansing
         keywords = keywords.map(function(k) {
