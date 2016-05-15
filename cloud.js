@@ -78,11 +78,12 @@ Cloud.prototype._initCompute = function(callback) {
 };
 
 /**
- * Lists the instances in the worker instance group.
+ * Lists the instances of the given instance group from a certain zone.
+ * @param zone
+ * @param instanceGroup
  * @param callback
  */
 Cloud.prototype.listVMsOfInstanceGroup = function(zone, instanceGroup, callback) {
-    var self = this;
     var params = {
         zone: zone,
         instanceGroupManager: instanceGroup
@@ -92,8 +93,7 @@ Cloud.prototype.listVMsOfInstanceGroup = function(zone, instanceGroup, callback)
         log.debug("Cloud.listVMsOfInstanceGroup: ", err, res);
         if (!err) {
             if ( typeof res.managedInstances != 'undefined' && res.managedInstances instanceof Array ) {
-                // last segment of the instance URL is the instance name.
-                // We add it here such that it can be used in getInstance calls
+                // Last segment of the instance URL is the instance name. We add it here such that it can be used in getInstance calls
                 res.managedInstances.forEach(function(instance) {
                     instance['name'] = instance.instance.split('/').pop();
                 });

@@ -10,6 +10,8 @@ let vms = [];
 let roundRobinIndex = 0;
 let cgeConfig = config.get("gcloud");
 let will = config.get("will");
+let loadBalancer = config.get("loadBalancer");
+const LIST_OF_VMS_UPDATE_INTERVAL = loadBalancer.listOfVmsUpdateInterval;
 
 // Useful links for the Twitter API:
 // Tweet JSON: https://dev.twitter.com/overview/api/tweets
@@ -56,8 +58,7 @@ function getKeywords(callback) {
     });
 }
 
-// processes incoming tweet. The tweet is inserted without
-// additional processing into the tweets collection.
+// Processes incoming tweet. We "distribute" the tweets in a round-robin manner to the currently running VMs of the will-nodes instance group.
 function onNewTweet(tweet) {
     log.debug('New Tweet:\t[id: %s, text: %s]', tweet['id_str'], tweet['text']);
 
@@ -121,12 +122,17 @@ function updateAvailableVMs() {
         if (!err) {
             cloud.listVMsOfInstanceGroup(will.instanceGroupZone, will.instanceGroupName, function(err, res) {
                 if (!err) {
-					vms = res.managedInstances.filter(function(vm) {
-						return (vm.hasOwnProperty('instanceStatus') && vm.instanceStatus === 'RUNNING');
-					}).map(function(vm) {
-						return vm.name;
-					});
-					log.info("Available will-nodes = ", vms);
+                    if (res.hasOwnProperty('managedInstances')) {
+						vms = res.managedInstances.filter(function(vm) {
+							return (vm.hasOwnProperty('instanceStatus') && vm.instanceStatus === 'RUNNING');
+						}).map(function(vm) {
+							return vm.name;
+						});
+						log.info("Available will-nodes = ", vms);
+                    }
+					else {
+						vms = ['default'];
+					}
                 }
                 else {
 					console.log(err);
@@ -167,7 +173,7 @@ const tweetfetcher = {
 
         // Periodically update list of available nodes of the will-nodes instance group
         updateAvailableVMs();
-        setInterval(updateAvailableVMs, 10*1000);
+        setInterval(updateAvailableVMs, LIST_OF_VMS_UPDATE_INTERVAL * 1000);
 
         // connect to twitter
         subscribeToTweets(function(stream) {

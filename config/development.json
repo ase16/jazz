@@ -15,6 +15,10 @@
         "instanceGroupZone": "europe-west1-d"
     },
 
+    "loadBalancer": {
+        "listOfVmsUpdateInterval": 10
+    },
+
     "log": {
         "level": "info"
     }

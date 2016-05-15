@@ -50,10 +50,6 @@ const db = {
             callback("Not connected", null);
             return;
         }
-
-        // ToDo: Maybe we should think about defining terms as ancestors
-        //          --> https://cloud.google.com/datastore/docs/concepts/entities#ancestor_paths
-        //          --> https://cloud.google.com/datastore/docs/concepts/structuring_for_strong_consistency#structuring_your_data_for_consistency
         var tweetKey = datastore.key(['Tweet', tweet['id_str']]);
         var time = Date.parse(tweet['created_at']);
         if (isNaN(time)) {
