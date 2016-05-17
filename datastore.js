@@ -24,7 +24,7 @@ const db = {
     // --> res is an array containing terms e.g. ['jay-z', 'google', 'solarpower']
     getAllTerms: function(callback) {
         if (!isConnected()) {
-            return callback("Not connected", []);
+            return callback("Datastore is not connected", []);
         }
 
         var keywords = [];
@@ -47,7 +47,7 @@ const db = {
     // @param callback fn(err, res)
     insertTweet: function(tweet, vm, callback) {
         if (!isConnected()) {
-            callback("Not connected", null);
+            callback("Datastore is not connected", null);
             return;
         }
         var tweetKey = datastore.key(['Tweet', tweet['id_str']]);
@@ -68,6 +68,29 @@ const db = {
                 return;
             }
             callback(null, tweetKey);
+        });
+    },
+
+    storeStat: function(newStat, callback) {
+        if (!isConnected()) {
+            callback("Datastore is not connected", null);
+            return;
+        }
+
+        var key = datastore.key(['JazzStat']);
+
+        datastore.save({
+            key: key,
+            data: {
+                created: newStat.created,
+                tweetsPerSec: newStat.tweetsPerSec
+            }
+        }, function(err) {
+            if (err) {
+                callback(err);
+                return;
+            }
+            callback(null, key);
         });
     }
 };

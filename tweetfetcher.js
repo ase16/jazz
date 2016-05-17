@@ -12,13 +12,15 @@ let cgeConfig = config.get("gcloud");
 let will = config.get("will");
 let loadBalancer = config.get("loadBalancer");
 const LIST_OF_VMS_UPDATE_INTERVAL = loadBalancer.listOfVmsUpdateInterval;
+let statsConfig = config.get("stats");
+const STATS_UPDATE_INTERVAL = statsConfig.updateInterval;
 
 // Useful links for the Twitter API:
 // Tweet JSON: https://dev.twitter.com/overview/api/tweets
 // Stream API: https://dev.twitter.com/streaming/overview
 
 // #tweets and ts when last updated.
-var stats = {
+let stats = {
     timestamp: new Date().getTime(),
     tweetsCount: 0
 };
@@ -145,17 +147,30 @@ function updateAvailableVMs() {
     });
 }
 
-// prints some statistics about the tweets in the DB and the received tweets.
-function logStats() {
+function updateStats() {
     var now = new Date().getTime();
-    var timeSpan = now-stats['timestamp'];
+    var timeSpan = now - stats['timestamp'];
     var newTweets = stats['tweetsCount'];
-    var tweetsPerSec = (newTweets/timeSpan*1000).toFixed(1);
-    if (isNaN(tweetsPerSec)) { tweetsPerSec=0.0 }
+    var tweetsPerSec = (newTweets / timeSpan * 1000).toFixed(1);
+    if (isNaN(tweetsPerSec)) { tweetsPerSec = 0.0 }
     stats.timestamp = now;
     stats.tweetsCount = 0;
-    
-    log.info('Fetching ' + tweetsPerSec + ' tweets/second');
+
+    var newStat = {
+        created: now,
+        tweetsPerSec: tweetsPerSec
+    };
+
+    log.info('Fetching ' + tweetsPerSec + ' tweets/s');
+
+    db.storeStat(newStat, function(err, key) {
+        if (!err) {
+            log.debug("Succesffuly created new entry for stats with key =", key);
+        }
+        else {
+            log.error("Error during writing stats to datastore. err =", err);
+        }
+    });
 }
 
 var twitterCredentials = config.get('twitter');
@@ -168,8 +183,8 @@ const tweetfetcher = {
 
         db = dbModule;
 
-        // set up logging of stats
-        setInterval(logStats, 10*1000);
+        // Periodically store amount of fetched tweets into datastore
+        setInterval(updateStats, STATS_UPDATE_INTERVAL * 1000);
 
         // Periodically update list of available nodes of the will-nodes instance group
         updateAvailableVMs();
