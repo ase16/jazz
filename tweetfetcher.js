@@ -126,7 +126,10 @@ function updateAvailableVMs() {
                 if (!err) {
                     if (res.hasOwnProperty('managedInstances')) {
 						vms = res.managedInstances.filter(function(vm) {
-							return (vm.hasOwnProperty('instanceStatus') && vm.instanceStatus === 'RUNNING');
+							return (
+                                (vm.hasOwnProperty('instanceStatus') && vm.instanceStatus === 'RUNNING')
+                                || (vm.hasOwnProperty('currentAction') && vm.currentAction === 'CREATING')
+                            );
 						}).map(function(vm) {
 							return vm.name;
 						});
