@@ -15,7 +15,8 @@ const LIST_OF_VMS_UPDATE_INTERVAL = loadBalancer.listOfVmsUpdateInterval;
 let statsConfig = config.get("stats");
 const STATS_UPDATE_INTERVAL = statsConfig.updateInterval;
 
-const TERMS_UPDATE_INTERVAL = config.get("jazz").termUpdateInterval
+const REASSIGN_LOST_TWEETS_INTERVAL = config.get("jazz").reassignLostTweetsInterval;
+const TERMS_UPDATE_INTERVAL = config.get("jazz").termUpdateInterval;
 let currentStreamTerms = [];
 
 // Useful links for the Twitter API:
@@ -64,13 +65,21 @@ function getTerms(callback) {
     });
 }
 
+// Selects the next VM in a round robin fashion
+// returns 'default' if no VM running.
+function selectNextVM() {
+    var currentRoundRobinIndex = roundRobinIndex;
+    roundRobinIndex = ((roundRobinIndex + 1) % vms.length == 0 ? 0 : roundRobinIndex + 1);
+    var selectedVM = vms.length > 0 ? vms[currentRoundRobinIndex] : 'default';
+    return selectedVM;
+}
+
 // Processes incoming tweet. We "distribute" the tweets in a round-robin manner to the currently running VMs of the will-nodes instance group.
 function onNewTweet(tweet) {
     log.debug('New Tweet:\t[id: %s, text: %s]', tweet['id_str'], tweet['text']);
 
-	var currentRoundRobinIndex = roundRobinIndex;
-	roundRobinIndex = ((roundRobinIndex + 1) % vms.length == 0 ? 0 : roundRobinIndex + 1);
-    db.insertTweet(tweet, vms[currentRoundRobinIndex], function(err, result){
+	var selectedVM = selectNextVM();
+    db.insertTweet(tweet, selectedVM, function(err, result){
         if (err) {
             log.error('Could not insert tweet:', err);
         } else {
@@ -164,7 +173,7 @@ function updateAvailableVMs() {
 						log.info("Available will-nodes = ", vms);
                     }
 					else {
-						vms = ['default'];
+						vms = [];
 					}
                 }
                 else {
@@ -204,6 +213,27 @@ function updateStats() {
     });
 }
 
+function reassignLostTweets() {
+    if (vms.length == 0) {
+        log.info("Skip reassigning tweets as no VMs are running");
+        // if no instances are running, we fill up the backlog (default)
+        return;
+    }
+    
+    log.info("Reassigning lost tweets.");
+    db.getLostTweets(vms, function(tweet) {
+        var selectedVM = selectNextVM();
+        tweet.data.vm = selectedVM;
+        db.updateTweet(tweet, function(err, res) {
+            if (err) {
+                log.error("Could not reassign tweet: ", err);
+            } else {
+                log.debug("Reassigned tweet to: " + selectedVM);
+            }
+        });
+    });
+}
+
 var twitterCredentials = config.get('twitter');
 var twitter = new twit(twitterCredentials);
 var twitterStream;
@@ -223,6 +253,9 @@ const tweetfetcher = {
 
         // Periodically update terms and reconnect to the twitter API in case of changes.
         setInterval(updateTerms, TERMS_UPDATE_INTERVAL * 1000);
+
+        // Periodically reassign tweets currently assigned to dead instances to running instances.
+        setInterval(reassignLostTweets, REASSIGN_LOST_TWEETS_INTERVAL * 1000);
 
         // connect to twitter
         updateTerms(function() {

@@ -12,6 +12,31 @@ let datastore;
 const isConnected = () => typeof datastore !== "undefined";
 
 
+// get a list of VMs that have tweets assigned
+function getAssignedButDeadVMs(vms, callback) {
+    if (!isConnected()) {
+        callback("Datastore is not connected", null);
+        return;
+    }
+    var deadVMs = [];
+    var query = datastore
+        .createQuery('Tweet')
+        .select(['vm'])
+        .groupBy(['vm']);
+    datastore.runQuery(query, function(err, res) {
+        if (err || !Array.isArray(res)) {
+            return onTweetCallback(err, null);
+        }
+        // filter 'dead' vms
+        res.forEach(function(v) {
+            if (vms.indexOf(v.data.vm) == -1) {
+                deadVMs.push(v.data.vm);
+            }
+        });
+        callback(null, deadVMs);
+    });
+}
+
 const db = {
     connect: function(conf, callback) {
         // do we already have a connection?
@@ -68,6 +93,38 @@ const db = {
                 return;
             }
             callback(null, tweetKey);
+        });
+    },
+
+    updateTweet: function(tweet, callback) {
+        if (!isConnected()) {
+            callback("Datastore is not connected", null);
+            return;
+        }
+
+        datastore.upsert(tweet, callback);
+    },
+
+    getLostTweets: function(vms, onTweetCallback) {
+        if (!isConnected()) {
+            onTweetCallback("Datastore is not connected", null);
+            return;
+        }
+
+        getAssignedButDeadVMs(vms, function(err, deadVMs) {
+            deadVMs.forEach(function(v) {
+                log.info("Reassign tweets of: " + v);
+                var deadTweetsQuery = datastore
+                    .createQuery('Tweet')
+                    .autoPaginate(true)
+                    .filter('vm', '=', v);
+                datastore.runQuery(deadTweetsQuery)
+                    .on('error', log.error)
+                    .on('data', onTweetCallback)
+                    .on('end', function() {
+                        log.info("Finished reassigning tweets of: " + v);
+                    });
+            });
         });
     },
 

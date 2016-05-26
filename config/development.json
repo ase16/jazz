@@ -11,7 +11,8 @@
     },
 
     "jazz": {
-        "termUpdateInterval": 30
+        "termUpdateInterval": 30,
+        "reassignLostTweetsInterval": 60
     },
 
     "will": {
