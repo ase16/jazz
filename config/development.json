@@ -10,6 +10,10 @@
         "projectId": "ase16-1255"
     },
 
+    "jazz": {
+        "termUpdateInterval": 30
+    },
+
     "will": {
         "instanceGroupName": "will-nodes",
         "instanceGroupZone": "europe-west1-d"

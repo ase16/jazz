@@ -15,6 +15,9 @@ const LIST_OF_VMS_UPDATE_INTERVAL = loadBalancer.listOfVmsUpdateInterval;
 let statsConfig = config.get("stats");
 const STATS_UPDATE_INTERVAL = statsConfig.updateInterval;
 
+const TERMS_UPDATE_INTERVAL = config.get("jazz").termUpdateInterval
+let currentStreamTerms = [];
+
 // Useful links for the Twitter API:
 // Tweet JSON: https://dev.twitter.com/overview/api/tweets
 // Stream API: https://dev.twitter.com/streaming/overview
@@ -26,7 +29,7 @@ let stats = {
 };
 
 // @parma callback fn(arr) - get array of keywords
-function getKeywords(callback) {
+function getTerms(callback) {
     db.getAllTerms(function(err, words) {
         var keywords = [];
         if (err) {
@@ -55,6 +58,7 @@ function getKeywords(callback) {
         keywords = keywords.filter(function(k) {
             return k.length > 0;
         });
+        keywords.sort();
 
         callback(keywords);
     });
@@ -77,45 +81,69 @@ function onNewTweet(tweet) {
 }
 
 // set up twitter stream and subscribe to keywords
-// @param onNewTweet function to call when new tweet is received
+// @param terms array of keywords
 // @param callback fn(stream)
-function subscribeToTweets(callback) {
-    getKeywords(function(keywords) {
-        var stream = twitter.stream('statuses/filter', {
-            track: keywords,
-            language: 'en'
-        });
-        stream.on('tweet', onNewTweet);
+function subscribeToTweets(terms, callback) {
+    var stream = twitter.stream('statuses/filter', {
+        track: terms,
+        language: 'en'
+    });
+    stream.on('tweet', onNewTweet);
 
-        // set up some logging
-        // the messages are described here:
-        // https://dev.twitter.com/streaming/overview/messages-types
-        stream.on('connect', function (request) {
-            log.info('Twitter - Connect');
-        });
-        stream.on('connected', function (response) {
-            log.info('Twitter - Connected');
-        });
-        stream.on('disconnect', function (disconnectMessage) {
-            log.warn('Twitter - Disconnect');
-        });
-        stream.on('reconnect', function (request, response, connectInterval) {
-            log.info('Twitter - Reconnect in %s ms', connectInterval);
-        });
-        stream.on('limit', function (limitMessage) {
-            log.warn('Twitter - Limit: ', limitMessage);
-        });
-        stream.on('warning', function (warning) {
-            log.warn('Twitter - Warning: ', warning);
-        });
-        stream.on('error', function (error) {
-            log.warn('Twitter - Error: ', error)
-        });
+    // set up some logging
+    // the messages are described here:
+    // https://dev.twitter.com/streaming/overview/messages-types
+    stream.on('connect', function (request) {
+        log.info('Twitter - Connect');
+    });
+    stream.on('connected', function (response) {
+        log.info('Twitter - Connected');
+    });
+    stream.on('disconnect', function (disconnectMessage) {
+        log.warn('Twitter - Disconnect');
+    });
+    stream.on('reconnect', function (request, response, connectInterval) {
+        log.info('Twitter - Reconnect in %s ms', connectInterval);
+    });
+    stream.on('limit', function (limitMessage) {
+        log.warn('Twitter - Limit: ', limitMessage);
+    });
+    stream.on('warning', function (warning) {
+        log.warn('Twitter - Warning: ', warning);
+    });
+    stream.on('error', function (error) {
+        log.warn('Twitter - Error: ', error)
+    });
 
-        log.info('Set up connectio n to twitter stream API.');
-        log.info('Stream keywords (%s): %s', keywords.length, keywords);
+    log.info('Set up connection to twitter stream API.');
+    log.info('Stream - terms (%s): %s', terms.length, terms);
 
-        callback(stream);
+    callback(stream);
+}
+
+function updateTerms(callback) {
+    getTerms(function(terms) {
+        // check whether terms still the same
+        var termsEqual = terms.length == currentStreamTerms.length &&
+                         terms.every(function (element, index) { return element === currentStreamTerms[index]; });
+        if (!termsEqual) {
+            // if already running, restart by stop->start
+            if (twitterStream) {
+                twitterStream.stop();
+                twitterStream = null;
+                log.info('updateTerms: restart stream due to new terms.');
+            }
+            // connect to twitter
+            subscribeToTweets(terms, function(stream) {
+                twitterStream = stream;
+                currentStreamTerms = terms;
+                log.info("Tweetfetcher: stream started.");
+                if (callback) callback();
+            });
+        } else {
+            log.info('updateTerms: no new terms.');
+            if (callback) callback();
+        }
     });
 }
 
@@ -193,9 +221,11 @@ const tweetfetcher = {
         updateAvailableVMs();
         setInterval(updateAvailableVMs, LIST_OF_VMS_UPDATE_INTERVAL * 1000);
 
+        // Periodically update terms and reconnect to the twitter API in case of changes.
+        setInterval(updateTerms, TERMS_UPDATE_INTERVAL * 1000);
+
         // connect to twitter
-        subscribeToTweets(function(stream) {
-            twitterStream = stream;
+        updateTerms(function() {
             callback();
             log.info("Tweetfetcher initialized");
         });
